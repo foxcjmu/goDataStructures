@@ -1,0 +1,1 @@
+go test containers/stack containers/queue containers/set containers/dictionary containers/list containers/internal/hashtbl containers/internal/tree
