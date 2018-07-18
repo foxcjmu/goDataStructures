@@ -34,9 +34,9 @@ func newTableNode(key containers.Hasher, value interface{}, link *tableNode) *ta
 
 // HashTable is the data structure for a hash table instance.
 type HashTable struct {
-	size  int          // how many slots in the table
-	count int          // how many values are stored in the table
-	table []*tableNode // the hash table itself
+	tableSize int          // how many slots in the table
+	count     int          // how many values are stored in the table
+	table     []*tableNode // the hash table itself
 }
 
 // Create and return a new empty hash table with an optionally specified
@@ -45,11 +45,11 @@ type HashTable struct {
 // DefaultTableSize.
 func NewHashTable(tableSize ...int) *HashTable {
 	result := new(HashTable)
-	result.size = DefaultTableSize
+	result.tableSize = DefaultTableSize
 	if 0 < len(tableSize) && 2 < tableSize[0] {
-		result.size = nextPrime(tableSize[0])
+		result.tableSize = nextPrime(tableSize[0])
 	}
-	result.table = make([]*tableNode, result.size)
+	result.table = make([]*tableNode, result.tableSize)
 	return result
 }
 
@@ -57,17 +57,17 @@ func NewHashTable(tableSize ...int) *HashTable {
 func (t *HashTable) Empty() bool { return t.count == 0 }
 
 // TableSize returns the number of slots in the hash table.
-func (t *HashTable) TableSize() int { return t.size }
+func (t *HashTable) TableSize() int { return t.tableSize }
 
 // Size returns the number of values in the hash table.
 func (t *HashTable) Size() int { return t.count }
 
 // Clear makes the hash table empty.
 func (t *HashTable) Clear() {
-	if t.size < 3 {
-		t.size = DefaultTableSize
+	if t.tableSize < 3 {
+		t.tableSize = DefaultTableSize
 	}
-	t.table = make([]*tableNode, t.size)
+	t.table = make([]*tableNode, t.tableSize)
 	t.count = 0
 }
 
@@ -76,10 +76,10 @@ func (t *HashTable) Clear() {
 // Precondition violation: return nil, false.
 // Normal return: return valuev, true.
 func (t *HashTable) Get(key containers.Hasher) (interface{}, bool) {
-	if t.size < 3 {
+	if t.tableSize < 3 {
 		t.Clear()
 	}
-	node := t.table[key.Hash(t.size)]
+	node := t.table[key.Hash(t.tableSize)]
 	for node != nil {
 		if node.key.Equal(key) {
 			return node.value, true
@@ -91,10 +91,10 @@ func (t *HashTable) Get(key containers.Hasher) (interface{}, bool) {
 
 // Insert puts v into the table, or replaces v if its is already there.
 func (t *HashTable) Insert(key containers.Hasher, value interface{}) {
-	if t.size < 3 {
+	if t.tableSize < 3 {
 		t.Clear()
 	}
-	index := key.Hash(t.size)
+	index := key.Hash(t.tableSize)
 	node := t.table[index]
 	for node != nil {
 		if node.key.Equal(key) {
@@ -109,10 +109,10 @@ func (t *HashTable) Insert(key containers.Hasher, value interface{}) {
 
 // Delete removes v from the table, or does nothing if it is not there.
 func (t *HashTable) Delete(key containers.Hasher) {
-	if t.size < 3 {
+	if t.tableSize < 3 {
 		t.Clear()
 	}
-	index := key.Hash(t.size)
+	index := key.Hash(t.tableSize)
 	node := t.table[index]
 	if node == nil {
 		return

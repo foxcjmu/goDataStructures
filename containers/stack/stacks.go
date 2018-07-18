@@ -18,9 +18,9 @@ import (
 // Stack is the interface for stacks in the containers hierarchy.
 type Stack interface {
 	containers.Container       // include Size, Clear, and Empty
-	Top() (interface{}, error) // return the top element of a non-empty stack
-	Pop() (interface{}, error) // remove and return top element of a non-empty stack
 	Push(e interface{})        // place a new element on the top of the stack
+	Pop() (interface{}, error) // remove and return top element of a non-empty stack
+	Top() (interface{}, error) // return the top element of a non-empty stack
 }
 
 // ArrayStack ----------------------------------------------------------------
@@ -42,16 +42,8 @@ func (s *ArrayStack) Empty() bool { return len(s.store) == 0 }
 // Clear removes all the items from the stack.
 func (s *ArrayStack) Clear() { s.store = make([]interface{}, 0, 10) }
 
-// Top returns the top value on the stack without removing it.
-// Pre: the stack is not empty.
-// Pre violation: return nil and an error indication.
-// Normal return: return the top element (which is not removed) and nil.
-func (s *ArrayStack) Top() (interface{}, error) {
-	if len(s.store) == 0 {
-		return nil, errors.New("Top: stack cannot be empty")
-	}
-	return s.store[len(s.store)-1], nil
-}
+// Push adds a new element to the top of the stack.
+func (s *ArrayStack) Push(e interface{}) { s.store = append(s.store, e) }
 
 // Pop removes and returns the top element on the stack.
 // Precondition: the stack is not empty.
@@ -66,8 +58,16 @@ func (s *ArrayStack) Pop() (interface{}, error) {
 	return result, nil
 }
 
-// Push adds a new element to the top of the stack.
-func (s *ArrayStack) Push(e interface{}) { s.store = append(s.store, e) }
+// Top returns the top value on the stack without removing it.
+// Pre: the stack is not empty.
+// Pre violation: return nil and an error indication.
+// Normal return: return the top element (which is not removed) and nil.
+func (s *ArrayStack) Top() (interface{}, error) {
+	if len(s.store) == 0 {
+		return nil, errors.New("Top: stack cannot be empty")
+	}
+	return s.store[len(s.store)-1], nil
+}
 
 // String makes a report on the container.
 func (s *ArrayStack) String() string {
@@ -87,8 +87,8 @@ type node struct {
 
 // LinkedStack is a linked implementation of a stack.
 type LinkedStack struct {
-	count  int   // how many elements are present
 	topPtr *node // singly-linked list of values
+	count  int   // how many elements are present
 }
 
 // Size returns the number of elements in the stack.
@@ -103,18 +103,12 @@ func (s *LinkedStack) Clear() {
 	s.topPtr = nil
 }
 
-// Top returns the top value on the stack without removing it.
-// Precondition: the stack is not empty.
-// Precondition violation: return nil and an error indication.
-// Normal return: return the top element (which is not removed) and nil.
-func (s *LinkedStack) Top() (interface{}, error) {
-	if s.count == 0 {
-		return nil, errors.New("Top: the stack cannot be empty")
-	}
-	return s.topPtr.item, nil
+// Push adds a new element to the top of the stack.
+func (s *LinkedStack) Push(e interface{}) {
+	s.topPtr = &node{e, s.topPtr}
+	s.count++
 }
 
-// Pop removes and returns the top element on the stack.
 // Precondition: the stack is not empty.
 // Precondition violation: return nil and an error indication.
 // Normal return: return the top element (which is removed) and nil.
@@ -128,12 +122,18 @@ func (s *LinkedStack) Pop() (interface{}, error) {
 	return result, nil
 }
 
-// Push adds a new element to the top of the stack.
-func (s *LinkedStack) Push(e interface{}) {
-	s.topPtr = &node{e, s.topPtr}
-	s.count++
+// Top returns the top value on the stack without removing it.
+// Precondition: the stack is not empty.
+// Precondition violation: return nil and an error indication.
+// Normal return: return the top element (which is not removed) and nil.
+func (s *LinkedStack) Top() (interface{}, error) {
+	if s.count == 0 {
+		return nil, errors.New("Top: the stack cannot be empty")
+	}
+	return s.topPtr.item, nil
 }
 
+// Pop removes and returns the top element on the stack.
 // String makes a report on the container.
 func (s *LinkedStack) String() string {
 	var result = fmt.Sprintf("LinkedStack instance:\nsize: %d\ncontents:", s.count)

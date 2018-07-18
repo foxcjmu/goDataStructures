@@ -219,8 +219,9 @@ type node struct {
 
 // LinkedList is a linked implementation of a list.
 type LinkedList struct {
-	head      *node // start of a doubly-linked list of values
 	count     int   // how many elements are in the list
+	head      *node // start of a doubly-linked list of values
+	tail      *node // end of a doubly-linked list of values
 	cursorPtr *node // node where the cursor rests
 	cursorIdx int   // index where the cursor rests
 }
@@ -235,29 +236,19 @@ type linkedListIterator struct {
 func (iter *linkedListIterator) Reset() { iter.current = iter.list.head }
 
 // Done is true iff the iterator has traversed its associated Collection.
-func (iter *linkedListIterator) Done() bool { return iter.current == iter.list.head }
+func (iter *linkedListIterator) Done() bool { return iter.current == nil }
 
 // Next returns an interface{} and an indication of whether iteration is complete.
 // Precondition: Iteration is not complete.
 // Precondition violation: return nil and false.
 // Normal return: the next element in the iteration and true.
 func (iter *linkedListIterator) Next() (interface{}, bool) {
-	if iter.current == iter.list.head {
+	if iter.current == nil {
 		return nil, false
 	}
 	result := iter.current.item
 	iter.current = iter.current.succ
 	return result, true
-}
-
-// init initializes a list with a dummy node if has not been initialized before.
-func (list *LinkedList) init() {
-	if list.head == nil {
-		dummy := &node{item: 0}
-		dummy.pred, dummy.succ = dummy, dummy
-		list.head, list.cursorPtr = dummy, dummy
-		list.cursorIdx = -1
-	}
 }
 
 // Size indicates how many elements are in the list.
@@ -266,8 +257,8 @@ func (list *LinkedList) Size() int { return list.count }
 // Clear removes all elements from the list.
 func (list *LinkedList) Clear() {
 	list.count = 0
-	list.head = nil
-	list.init()
+	list.head, list.tail = nil, nil
+	list.cursorPtr, list.cursorIdx = nil, 0
 }
 
 // Empty returns true just in case the list has not elements.
@@ -275,25 +266,22 @@ func (list *LinkedList) Empty() bool { return list.count == 0 }
 
 // NewIterator creates and returns an external iterator for a LinkedList.
 func (list *LinkedList) NewIterator() containers.Iterator {
-	list.init()
 	result := new(linkedListIterator)
 	result.list = list
-	result.current = list.head.succ
+	result.current = list.head
 	return result
 }
 
 // Apply calls function f on every element in the Collection.
 func (list *LinkedList) Apply(f func(interface{})) {
-	list.init()
-	for ptr := list.head.succ; ptr != list.head; ptr = ptr.succ {
+	for ptr := list.head; ptr != nil; ptr = ptr.succ {
 		f(ptr.item)
 	}
 }
 
 // Contains returns true iff element e is in the Collection.
 func (list *LinkedList) Contains(e interface{}) bool {
-	list.init()
-	for ptr := list.head.succ; ptr != list.head; ptr = ptr.succ {
+	for ptr := list.head; ptr != nil; ptr = ptr.succ {
 		if ptr.item == e {
 			return true
 		}
@@ -309,12 +297,27 @@ func (list *LinkedList) Insert(i int, e interface{}) error {
 	if i < 0 || list.count < i {
 		return fmt.Errorf("Insert: index out of bounds: %d", i)
 	}
-	list.init()
-	list.setCursor(i)
-	newNode := &node{e, list.cursorPtr.pred, list.cursorPtr}
-	list.cursorPtr.pred.succ = newNode
-	list.cursorPtr.pred = newNode
-	list.cursorPtr = newNode
+	if i == 0 {
+		list.head = &node{e, nil, list.head}
+		if list.head.succ != nil {
+			list.head.succ.pred = list.head
+		}
+		if list.tail == nil {
+			list.tail = list.head
+		}
+		if list.cursorPtr != nil {
+			list.cursorIdx++
+		}
+	} else if i == list.count {
+		list.tail.succ = &node{e, list.tail, nil}
+		list.tail = list.tail.succ
+	} else {
+		list.setCursor(i)
+		newNode := &node{e, list.cursorPtr.pred, list.cursorPtr}
+		list.cursorPtr.pred.succ = newNode
+		list.cursorPtr.pred = newNode
+		list.cursorPtr = newNode
+	}
 	list.count++
 	return nil
 }
@@ -328,12 +331,34 @@ func (list *LinkedList) Delete(i int) (interface{}, error) {
 		return nil, fmt.Errorf("Delete: index out of bounds: %d", i)
 	}
 	var result interface{}
-	list.init()
-	list.setCursor(i)
-	result = list.cursorPtr.item
-	list.cursorPtr.pred.succ = list.cursorPtr.succ
-	list.cursorPtr.succ.pred = list.cursorPtr.pred
-	list.cursorPtr = list.cursorPtr.succ
+	if list.count == 1 {
+		result = list.head.item
+		list.Clear()
+		return result, nil
+	}
+	if i == 0 {
+		result = list.head.item
+		list.head.succ.pred = nil
+		list.head = list.head.succ
+		if list.cursorIdx > 0 {
+			list.cursorIdx--
+		} else {
+			list.cursorPtr = list.head
+		}
+	} else if i == list.count-1 {
+		result = list.tail.item
+		list.tail = list.tail.pred
+		list.tail.succ = nil
+		if list.cursorIdx == list.count-1 {
+			list.cursorIdx, list.cursorPtr = list.count-2, list.tail
+		}
+	} else {
+		list.setCursor(i)
+		result = list.cursorPtr.item
+		list.cursorPtr.pred.succ = list.cursorPtr.succ
+		list.cursorPtr.succ.pred = list.cursorPtr.pred
+		list.cursorPtr = list.cursorPtr.succ
+	}
 	list.count--
 	return result, nil
 }
@@ -346,7 +371,6 @@ func (list *LinkedList) Get(i int) (interface{}, error) {
 	if i < 0 || list.count <= i {
 		return nil, fmt.Errorf("Get: index out of bounds: %d", i)
 	}
-	list.init()
 	list.setCursor(i)
 	return list.cursorPtr.item, nil
 }
@@ -359,7 +383,6 @@ func (list *LinkedList) Put(i int, e interface{}) error {
 	if i < 0 || list.count <= i {
 		return fmt.Errorf("Put: index out of bounds: %d", i)
 	}
-	list.init()
 	list.setCursor(i)
 	list.cursorPtr.item = e
 	return nil
@@ -368,8 +391,7 @@ func (list *LinkedList) Put(i int, e interface{}) error {
 // Index returns the location of element e. If e is not present,
 // return 0 and false; otherwise return the location and true.
 func (list *LinkedList) Index(e interface{}) (int, bool) {
-	list.init()
-	for index, ptr := 0, list.head.succ; ptr != list.head; index, ptr = index+1, ptr.succ {
+	for index, ptr := 0, list.head; ptr != nil; index, ptr = index+1, ptr.succ {
 		if ptr.item == e {
 			return index, true
 		}
@@ -384,7 +406,6 @@ func (list *LinkedList) Index(e interface{}) (int, bool) {
 // location i and j-1; return this new list and nil.
 func (list *LinkedList) Slice(i, j int) (List, error) {
 	result := new(LinkedList)
-	result.init()
 	if i < 0 || j < i || list.count < j {
 		return result, fmt.Errorf("Slice: illegal indices: %d %d", i, j)
 	}
@@ -405,10 +426,9 @@ func (list *LinkedList) Equal(l List) bool {
 	if list.count != l.Size() {
 		return false
 	}
-	list.init()
 	iter := l.NewIterator()
 	v, ok := iter.Next()
-	for ptr := list.head.succ; ptr != list.head; ptr = ptr.succ {
+	for ptr := list.head; ptr != nil; ptr = ptr.succ {
 		if !ok || ptr.item != v {
 			return false
 		}
@@ -426,16 +446,13 @@ func abs(a int) int {
 }
 
 // setCursor moves the cursor to a location taking the shortest route.
-// Precondition: index is in range and list has been initialized.
+// Precondition: i is in range.
 func (list *LinkedList) setCursor(index int) {
-	if index <= list.count/2 {
-		if index+1 < abs(index-list.cursorIdx) {
-			list.cursorIdx, list.cursorPtr = -1, list.head
-		}
-	} else {
-		if list.count-index < abs(list.cursorIdx-index) {
-			list.cursorIdx, list.cursorPtr = list.count, list.head
-		}
+	if list.cursorPtr == nil || index < abs(list.cursorIdx-index) {
+		list.cursorIdx, list.cursorPtr = 0, list.head
+	}
+	if list.count-index < abs(list.cursorIdx-index) {
+		list.cursorIdx, list.cursorPtr = list.count-1, list.tail
 	}
 	for index < list.cursorIdx { // go backwards
 		list.cursorIdx, list.cursorPtr = list.cursorIdx-1, list.cursorPtr.pred
@@ -447,13 +464,12 @@ func (list *LinkedList) setCursor(index int) {
 
 // String makes a report on the data structure.
 func (list *LinkedList) String() string {
-	list.init()
 	result := fmt.Sprintf("LinkedList instance:\nsize: %d\n", list.count)
-	if list.cursorPtr != list.head {
+	if list.cursorPtr != nil {
 		result += fmt.Sprintf("Cursor: [%d] %v\n", list.cursorIdx, list.cursorPtr.item)
 	}
 	result += "Values:"
-	for ptr := list.head.succ; ptr != list.head; ptr = ptr.succ {
+	for ptr := list.head; ptr != nil; ptr = ptr.succ {
 		result += fmt.Sprintf(" %v ", ptr.item)
 	}
 	return result + "\n"
